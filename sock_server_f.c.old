@@ -1,0 +1,123 @@
+/******************************************************/
+/********** TEST CODE Modified by Ziho Shin ***********/
+/******************************************************/
+/******************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#define OUTBWINDOWSIZE          0x200000
+#define MB			262144
+////////////////////////////////////////////////////
+void error_handling(char *message);
+
+void main(int argc, char **argv){
+        int serv_sock;
+	int clnt_sock;
+	int clnt_addr_size;
+	int loop1;
+	int loop2;
+	int loop3;
+	int message[OUTBWINDOWSIZE];
+	int str_len;
+	int str_len2;
+	int count;
+	char sync[OUTBWINDOWSIZE];
+	FILE *fd;
+	
+        struct sockaddr_in serv_addr;
+	struct sockaddr_in clnt_addr;
+
+        printf("\n\n================================================ \n");
+        printf("================================================ \n");
+        printf("Ethernet Networking Test Program - Server\n");
+        printf("================================================ \n");
+        printf("================================================ \n\n");
+        /******************************************************/
+	if(argc!=2){
+                printf("Usage : %s <port>\n", argv[0]);
+                exit(1);
+        }
+
+        serv_sock = socket(PF_INET, SOCK_STREAM, 0);
+        //Sever socket create
+        if(serv_sock == -1)
+                error_handling("Socket create error");
+
+        memset(&serv_addr, 0, sizeof(serv_addr));
+        serv_addr.sin_family = AF_INET;
+        //Server IP adderess
+        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        //RX from anywhere
+        serv_addr.sin_port=htons(atoi(argv[1]));
+        //Server port number
+
+        if(bind(serv_sock, (struct sockaddr*) & serv_addr,
+                sizeof(serv_addr)) == -1) // Socket address assign
+                error_handling("Socket binding error");
+
+        if(listen(serv_sock, 5) == -1) // Connection waiting
+                error_handling("Server listen error");
+
+        clnt_addr_size = sizeof(clnt_addr);
+
+        clnt_sock = accept(serv_sock, (struct sockaddr*) & clnt_addr,
+                        & clnt_addr_size); // Connection accepting
+/////////////////////////////////////////////////////////////////////////
+        printf("Client connected Information :\n\n");
+	printf("Port Number                  : %s\n", argv[1]);
+	printf("Client address               : %s\n", inet_ntoa(clnt_addr.sin_addr));
+	printf("Outbound Window Size         : 0x%x\n", OUTBWINDOWSIZE);
+	printf("================================================ \n");
+        if(clnt_sock == -1){
+                error_handling("Accept error");
+	}
+//	loop2=200;
+	loop2=10;
+	printf("Waiting for Client Sync message\n");
+	str_len = read(clnt_sock, sync, OUTBWINDOWSIZE);
+	printf("%s\n",sync);
+	write(clnt_sock, sync, str_len); //echo back
+	printf("Sending dummy data size to Client\n");
+	//write(clnt_sock, (char*)&loop2, sizeof(int));
+	count=0;
+        for(loop1 = 0; loop1 < loop2; loop1++){
+                for(loop3 = 0; loop3<MB; loop3++){
+                message[loop3]=20;
+                }
+        }
+	printf("Dummy data cycle size set as %d\n",loop2);
+	printf("Ready to send Dummy data\n");
+	printf("Start to transfer\n");
+	while(1){
+	write(clnt_sock, (char*)&message[0],sizeof(int));
+	read(clnt_sock, sync, MB);
+	if(!strcmp(sync,"ack")) break;
+	}
+        close(clnt_sock); // Connection close
+        printf("================================================ \n");
+	printf("TCP over dummy data transfer finished\n");
+	printf("Socket Connection closed\n");
+        fd = fopen("dummy_eth.db","w");
+        printf("File discripter openned\n");
+        for(loop1 = 0; loop1 < loop2; loop1++){
+               for(loop3 = 0; loop3<MB; loop3++){
+	       fprintf(fd,"%d",message[loop3]);
+               }
+        }
+	printf("Sended dummy data saved as 'dummy_eth.db'\n");
+	printf("\n");
+	fclose(fd);
+}
+
+void error_handling(char *message){
+        fputs(message, stderr);
+        fputc('\n', stderr);
+        exit(1);
+}
+

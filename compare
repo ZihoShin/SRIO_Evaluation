@@ -1,0 +1,3 @@
+diff -d dummy.db received.dat
+ls -alh received.dat
+
